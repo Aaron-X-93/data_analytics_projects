@@ -1,13 +1,9 @@
 ---
-title: "CSDA_Lab1"
+title: "CSDA1040_Lab1"
 author: "Aaron"
 date: "9/16/2020"
 output: pdf_document
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ### Load the libraries
 ```{r, include=FALSE}
@@ -78,12 +74,6 @@ orders %>%
 ### When do they order again
 ```{r}
 orders %>% 
-  ggplot(aes(x=days_since_prior_order)) + 
-  geom_histogram(stat="count",fill="blue")
-```
-
-```{r}
-order_products %>% 
   ggplot(aes(x=days_since_prior_order)) + 
   geom_histogram(stat="count",fill="blue")
 ```
@@ -208,32 +198,159 @@ order_products_prior %>%
 
 ### 
 ```{r}
-
+order_products_prior %>% 
+  left_join(orders) %>% left_join(products) %>%
+  group_by(order_hour_of_day, product_name) %>%
+  summarize(n=n()) %>%
+  mutate(percentage=n/sum(n)) %>%
+  top_n(10, wt=n) %>%
+  ggplot(aes(x=as.factor(order_hour_of_day), y=percentage, fill=product_name)) + 
+    geom_col() + ylab('Proprtion of Orders In An Hour') + 
+    ggtitle('Hourly Top 10 Products Ordered') +
+    theme(legend.position="bottom",legend.direction="horizontal")
 ```
 
 ## Visualizing the Product Portfolio
 
-### 
+### use treemap package to visualize the structure of instacarts product portfolio, 
 ```{r}
-
+# Import the library
+#install.packages("treemap")
+library(treemap)
 ```
 
 ### 
 ```{r}
-
+tmp4 <- products %>% 
+  group_by(department_id, aisle_id) %>% 
+  summarize(n=n()) %>% 
+  left_join(departments, by="department_id") %>% 
+  left_join(aisles, by="aisle_id")
 ```
 
 ### 
 ```{r}
-
+tmp5 <-order_products %>% 
+  group_by(product_id) %>% 
+  summarize(count=n()) %>% 
+  left_join(products, by="product_id") %>% 
+  ungroup() %>% 
+  group_by(department_id, aisle_id) %>% 
+  summarize(sumcount = sum(count)) %>% 
+  left_join(tmp4, by = c("department_id", "aisle_id")) %>% 
+  mutate(onesize = 1)
 ```
 
-### 
+### Visualize in aisles organized within departments?
+```{r}
+treemap(tmp5,index=c("department","aisle"), vSize="onesize",vColor="department", 
+        palette="Set3", title="", sortID="-sumcount", border.col="#FFFFFF") 
+        #type="categorical", fontsize.legend = 0,bg.labels = "#FFFFFF")
+```
+
+### How many unique products are offered in each department/aisle?
+```{r}
+# The size of the boxes shows the number of products in each category.
+treemap(tmp5,index=c("department","aisle"),vSize="n",title="",palette="Set3",border.col="#FFFFFF")
+```
+
+### How often are products from the department/aisle sold?
+```{r}
+# The size of the boxes shows the number of sales.
+treemap(tmp5,index=c("department","aisle"),vSize="sumcount",title="",palette="Set3",border.col="#FFFFFF")
+```
+
+###
 ```{r}
 
 ```
 
-### 
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+
+```
+
+###
 ```{r}
 
 ```
