@@ -14,6 +14,10 @@ library(knitr)
 library(stringr)
 library(DT)
 library(gridExtra)
+library(tidyverse)
+library(recommenderlab)
+library(tidyfst)
+library(treemap)
 ```
 
 ### Load the data
@@ -44,6 +48,15 @@ str(order_products)
 str(order_products_prior)
 str(aisles)
 str(departments)
+```
+
+```{r}
+colSums(is.na(orders))
+colSums(is.na(products))
+colSums(is.na(order_products))
+colSums(is.na(order_products_prior))
+colSums(is.na(aisles))
+colSums(is.na(departments))
 ```
 
 ### Recode variables
@@ -214,13 +227,6 @@ order_products_prior %>%
 
 ### use treemap package to visualize the structure of instacarts product portfolio, 
 ```{r}
-# Import the library
-#install.packages("treemap")
-library(treemap)
-```
-
-### 
-```{r}
 tmp4 <- products %>% 
   group_by(department_id, aisle_id) %>% 
   summarize(n=n()) %>% 
@@ -260,49 +266,66 @@ treemap(tmp5,index=c("department","aisle"),vSize="n",title="",palette="Set3",bor
 treemap(tmp5,index=c("department","aisle"),vSize="sumcount",title="",palette="Set3",border.col="#FFFFFF")
 ```
 
-###
-```{r}
 
+## Predictive Analysis
+
+### Create a training label, which is 1 or 0, to indicate the actual basket content.
+```{r}
+data_train = orders %>% 
+  filter(eval_set=='train') %>% 
+  left_join(order_products) %>%
+  left_join(products) %>%
+  mutate(actual=1) %>%   #this is training label
+  select(user_id, order_id, product_id, product_name, actual)
 ```
 
 ###
 ```{r}
-
+head(data_train)
 ```
 
 ###
 ```{r}
+data_train <- data_train %>% mutate(actual = as.double(actual),
+                                    user_id = as.double(user_id))
 
+glimpse(data_train)
 ```
 
 ###
 ```{r}
-
+ratings_matrix <- data_train %>%
+# Select only needed variables
+  select(user_id, product_name) %>% 
+# Add a column of 1s
+  mutate(value = 1) %>%
+# Spread into user-item format
+  spread(product_name, value, fill = 0) %>% #, convert = FALSE, drop = TRUE
+  select(-user_id) %>%
+# Convert to matrix
+  as.matrix() %>%
+# Convert to recommenderlab class 'binaryRatingsMatrix'
+  as("binaryRatingMatrix")
+ratings_matrix
 ```
 
 ###
 ```{r}
-
+tmp6 <- tmp6 %>%
+  select(user_id, product_name, actual)
+spread(tmp6, product_name, actual, fill = 0, convert = FALSE, drop = TRUE)
 ```
 
 ###
 ```{r}
-
+# colSums(is.na(data_train))
+summary(tmp6)
 ```
 
 ###
 ```{r}
-
-```
-
-###
-```{r}
-
-```
-
-###
-```{r}
-
+memory.limit()
+# memory.limit(50000)
 ```
 
 ###
