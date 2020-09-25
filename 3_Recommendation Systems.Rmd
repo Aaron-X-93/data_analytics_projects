@@ -310,7 +310,7 @@ summary(data_train)
 ###
 ```{r}
 train01 <- data_train %>% 
-  filter(user_id <= 50000)
+  filter(user_id <= 51732)
 glimpse(train01)
 ```
 
