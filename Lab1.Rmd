@@ -22,41 +22,56 @@ library(treemap)
 
 ### Load the data
 ```{r data, include=FALSE, echo=FALSE}
-orders <- fread("C:/Users/AS/Downloads/data/orders.csv")
-products <- fread('C:/Users/AS/Downloads/data/products.csv')
-order_products <- fread('C:/Users/AS/Downloads/data/order_products__train.csv')
-order_products_prior <- fread('C:/Users/AS/Downloads/data/order_products__prior.csv')
-aisles <- fread('C:/Users/AS/Downloads/data/aisles.csv')
-departments <- fread('C:/Users/AS/Downloads/data/departments.csv')
+orders <- fread("C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/orders.csv")
+products <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/products.csv')
+order_products <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/order_products__train.csv')
+order_products_prior <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/order_products__prior.csv')
+aisles <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/aisles.csv')
+departments <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/departments.csv')
+```
+
+### Load the data
+```{r data, include=FALSE, echo=FALSE}
+orders_csv <- readr::read_csv("C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/orders.csv")
+# products <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/products.csv')
+# order_products <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/order_products__train.csv')
+# order_products_prior <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/order_products__prior.csv')
+# aisles <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/aisles.csv')
+# departments <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-analysis/departments.csv')
+```
+
+```{r}
+head(orders_csv)
+head(orders)
 ```
 
 ### Peek at the dataset 1
 ```{r}
-kable(head(orders,10))
-kable(head(products,10))
-kable(head(order_products,10))
-kable(head(order_products_prior,10))
-kable(head(aisles,10))
-kable(head(departments,10))
+# kable(head(orders,10))
+# kable(head(products,10))
+# kable(head(order_products,10))
+# kable(head(order_products_prior,10))
+# kable(head(aisles,10))
+# kable(head(departments,10))
 ```
 
 ### Peek at the dataset 2
 ```{r}
-str(orders)
-str(products)
-str(order_products)
-str(order_products_prior)
-str(aisles)
-str(departments)
+# str(orders)
+# str(products)
+# str(order_products)
+# str(order_products_prior)
+# str(aisles)
+# str(departments)
 ```
 
 ```{r}
-colSums(is.na(orders))
-colSums(is.na(products))
-colSums(is.na(order_products))
-colSums(is.na(order_products_prior))
-colSums(is.na(aisles))
-colSums(is.na(departments))
+# colSums(is.na(orders))
+# colSums(is.na(products))
+# colSums(is.na(order_products))
+# colSums(is.na(order_products_prior))
+# colSums(is.na(aisles))
+# colSums(is.na(departments))
 ```
 
 ### Recode variables
@@ -281,20 +296,32 @@ data_train = orders %>%
 
 ###
 ```{r}
+# data_train <- data_train %>% mutate(actual = as.double(actual),
+#                                     user_id = as.double(user_id))
+glimpse(data_train)
 head(data_train)
 ```
 
 ###
 ```{r}
-data_train <- data_train %>% mutate(actual = as.double(actual),
-                                    user_id = as.double(user_id))
-
-glimpse(data_train)
+summary(data_train)
 ```
 
 ###
 ```{r}
-ratings_matrix <- data_train %>%
+train01 <- data_train %>% 
+  filter(user_id <= 50000)
+glimpse(train01)
+```
+
+###
+```{r}
+
+```
+
+###
+```{r}
+ratings_matrix <- train01 %>%
 # Select only needed variables
   select(user_id, product_name) %>% 
 # Add a column of 1s
@@ -311,21 +338,21 @@ ratings_matrix
 
 ###
 ```{r}
-tmp6 <- tmp6 %>%
-  select(user_id, product_name, actual)
-spread(tmp6, product_name, actual, fill = 0, convert = FALSE, drop = TRUE)
-```
-
-###
-```{r}
-# colSums(is.na(data_train))
-summary(tmp6)
+data_train %>% 
+  select(user_id, product_name) %>% 
+  mutate(n=1)  %>%
+  arrange(product_name) %>% 
+  pivot_wider(names_from = "product_name", values_from = "n", values_fill=0)
 ```
 
 ###
 ```{r}
 memory.limit()
-# memory.limit(50000)
+```
+
+###
+```{r}
+
 ```
 
 ###
