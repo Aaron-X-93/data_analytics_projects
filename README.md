@@ -1,4 +1,4 @@
-## Hands-on Projects for Advanced Data Science and Predictive Analytics Certification
+## Projects Review
 
 ### 1 Hotel Bookings Analysis
 [Hotel booking demand Dataset](https://www.kaggle.com/jessemostipak/hotel-booking-demand)
