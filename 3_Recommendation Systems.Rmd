@@ -310,7 +310,7 @@ summary(data_train)
 ###
 ```{r}
 train01 <- data_train %>% 
-  filter(user_id <= 51732)
+  filter(user_id <= 25000)
 glimpse(train01)
 ```
 
@@ -338,7 +338,7 @@ ratings_matrix
 
 ###
 ```{r}
-data_train %>% 
+train01 %>% 
   select(user_id, product_name) %>% 
   mutate(n=1)  %>%
   arrange(product_name) %>% 
@@ -347,12 +347,25 @@ data_train %>%
 
 ###
 ```{r}
-memory.limit()
+scheme <- ratings_matrix %>% 
+  evaluationScheme(method = "cross",
+                   k      = 5, 
+                   train  = 0.8,  
+                   given  = -1)
+scheme
 ```
 
 ###
 ```{r}
-
+algorithms <- list(
+  "association rules" = list(name  = "AR", 
+                        param = list(supp = 0.01, conf = 0.01)),
+  "random items"      = list(name  = "RANDOM",  param = NULL),
+  "popular items"     = list(name  = "POPULAR", param = NULL),
+  "item-based CF"     = list(name  = "IBCF", param = list(k = 5)),
+  "user-based CF"     = list(name  = "UBCF", 
+                        param = list(method = "Cosine", nn = 500))
+                   )
 ```
 
 ###
