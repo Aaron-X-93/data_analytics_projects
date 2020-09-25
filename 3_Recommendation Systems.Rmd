@@ -350,7 +350,7 @@ train01 %>%
 scheme <- ratings_matrix %>% 
   evaluationScheme(method = "cross",
                    k      = 5, 
-                   train  = 0.8,  
+                   train  = 0.7,  
                    given  = -1)
 scheme
 ```
