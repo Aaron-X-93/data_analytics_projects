@@ -1,0 +1,38 @@
+---
+title: "4_Twitter Text Analytics"
+author: "Aaron"
+date: "10/3/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(twitteR)
+library(purrr)
+library(dplyr)
+library(plyr)
+library(stringr)
+library(ROAuth)
+library(RCurl)
+library(openssl)
+library(httpuv)
+library(wordcloud)
+library(tm)
+library(SnowballC)
+library(wordcloud2)
+library(dplyr) 
+```
+
+```{r}
+consumer_key <- "vtvxi6T1bKkGxDjrEAydhLISt" 
+consumer_secret <- "KUydMhnG7HK42a48pxFIKjPT5AsbAgI5wUjtWLZtY9MgAMaJUB" 
+access_token <- "1312534545858691073-apEjK0Mk8TinBSCAoPM4g8bstKQCrJ" 
+access_secret <- "qsk5KXFOw0Ec68CVsgk99wajb9TAGCwiTWx3Nc78UIaYp" 
+setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret) 
+```
+
+```{r}
+politician_list <- searchTwitter ("@PoliticianTwitterHandle", n=500) 
+listA <- searchTwitter ('US election', n=1000)
+listB <- searchTwitter ('US election + economy', n=800)
+```
+
