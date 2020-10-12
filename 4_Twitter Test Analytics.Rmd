@@ -19,10 +19,12 @@ library(wordcloud)
 library(tm)
 library(SnowballC)
 library(wordcloud2)
-library(dplyr) 
+library(dplyr)
+library(lubridate) # created variable in y-m-d-h-s format
 ```
 
 ```{r}
+app_name = 'CSDA_Lab'
 consumer_key <- "vtvxi6T1bKkGxDjrEAydhLISt" 
 consumer_secret <- "KUydMhnG7HK42a48pxFIKjPT5AsbAgI5wUjtWLZtY9MgAMaJUB" 
 access_token <- "1312534545858691073-apEjK0Mk8TinBSCAoPM4g8bstKQCrJ" 
@@ -31,8 +33,133 @@ setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret)
 ```
 
 ```{r}
-politician_list <- searchTwitter ("@PoliticianTwitterHandle", n=500) 
-listA <- searchTwitter ('US election', n=1000)
-listB <- searchTwitter ('US election + economy', n=800)
+# politician_list <- searchTwitter ("@PoliticianTwitterHandle", n=500) 
+listA <- searchTwitter ('US election', n=100)
+listB <- searchTwitter ('US election + economy', n=100)
+```
+
+```{r}
+country1 <- search_tweets("#Canada", n=100, include_rts = FALSE)
+country2 <- search_tweets("#Scotland", n=100, include_rts = FALSE)
+```
+
+```{r}
+davis_list <- searchTwitter ("@rodneydavis" , n=100) 
+```
+
+```{r}
+# convert the list to a data frame
+davis_df <- bind_rows(lapply(davis_list, as.data.frame))
+```
+
+```{r}
+davis_df$date <- day(davis_df$created) 
+davis_df$hour <- hour(davis_df$created) 
+# separating out distinct date and hour variable from the current format time 
+# created variable in the dataset is in y-m-d-h-s format
+```
+
+```{r}
+#Volume of tweets by date/hour
+ggplot(davis_df, aes(x = date)) + 
+  geom_density() 
+ggplot(davis_df, aes(x = hour)) +
+  geom_density() 
+```
+
+### Most commonly used words for Davis in positive and negative context, i.e., sentiments of speech
+```{r}
+# Data cleaning – removing twitter mentions, stop words “the”, “it”, punctuations, capitalizations, etc.
+davis_df$text <- gsub("@[[:alpha:]]*","", davis_df$text)  # remove twitter mentions
+text_corpus <- Corpus(VectorSource(davis_df$text))  # convert dataframe containing “text” into corpus 
+text_corpus <- tm_map(text_corpus, tolower) # converting to lowercase
+text_corpus <- tm_map(text_corpus, removeWords, c("rodneydavis", "rt", "re", "amp")) 
+# remove “rodneydavis”, and tweets which are retweet and reply and &
+```
+
+```{r}
+library(tm)
+text_corpus <- tm_map(text_corpus, removeWords, stopwords("english")) # remove stop words
+text_corpus <- tm_map(text_corpus, removePunctuation)  # remove punctuations
+```
+
+```{r}
+text_df <- data.frame(text_clean = get("content", text_corpus), stringsAsFactors = FALSE)  
+# convert clean corpus into dataframe
+```
+
+```{r}
+davis_df <- cbind.data.frame(davis_df, text_df) 
+# combine text_df to davis_df
+```
+
+### Sentiment Analysis
+```{r}
+install.packages("SentimentAnalysis")
+library(SentimentAnalysis)
+# Sentiment scoring of each tweet based on 4 dictionaries GI, HE, LM, QDAP
+davis_sentiment <- analyzeSentiment(davis_df$text_clean)
+```
+
+```{r}
+#Isolating tweets which have more negative sentiments
+davis_sentiment <- dplyr::select(davis_sentiment, SentimentGI, SentimentHE, SentimentLM, SentimentQDAP, WordCount)  # sum sentiment scoring for each tweet
+```
+
+```{r}
+davis_sentiment <- dplyr::mutate(davis_sentiment, mean_sentiment = rowMeans(davis_sentiment[,-5])) 
+#mean value of sentiment for each tweet
+```
+
+```{r}
+davis_sentiment <- dplyr::select(davis_sentiment, WordCount, mean_sentiment) 
+davis_df <- cbind.data.frame(davis_df, davis_sentiment) 
+```
+
+```{r}
+davis_df_negative <- filter(davis_df, mean_sentiment < 0) 
+nrow(davis_df_negative) 
+```
+
+### The most commonly contained topics within tweets (frequency analysis)
+```{r}
+library(quanteda) 
+davis_tokenized_list <- tokens(davis_df_negative$text_clean)  # separating out each word individually
+```
+
+```{r}
+davis_dfm <- dfm(davis_tokenized_list)  # creating feature document matrix (tweet x words)
+word_sums <- colSums(davis_dfm)  # count of the use for every word
+length(word_sums) 
+```
+
+```{r}
+freq_data <- data.frame(word = names(word_sums), freq = word_sums, row.names = NULL, stringsAsFactors = FALSE)   # frequency of each word
+```
+
+```{r}
+sorted_freq_data <- freq_data[order(freq_data$freq, decreasing = TRUE), ]  # sorted most to least common words
+```
+
+### Create topic clusters (i.e., grouping words which are most associated with each other) 
+```{r}
+davis_corpus_tm <- Corpus(VectorSource(davis_df_negative[,19]))  
+# converting 19th column (text_clean) into corpus format text_clean
+```
+
+```{r}
+davis_dtm <- DocumentTermMatrix(davis_corpus_tm) # converting it into document term matrix
+davis_dtm <- removeSparseTerms(davis_dtm, 0.98) # removing words which are below threshold (2%)
+davis_df_cluster <- as.data.frame(as.matrix(davis_dtm))  # converting dtm into dataframe
+```
+
+```{r}
+#Exploratory graph analysis – word clusters based on correaltions
+# install.packages("devtools")
+library(devtools)
+devtools::install_github("hfgolino/EGA")
+library(EGA) 
+ega_davis <- EGA(davis_df_cluster)  # visual indicating words in each node
+ega_davis$dim.variables   # word –cluster association
 ```
 

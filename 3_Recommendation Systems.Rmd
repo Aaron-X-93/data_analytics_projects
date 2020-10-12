@@ -1,5 +1,5 @@
 ---
-title: "CSDA1040_Lab1"
+title: "CSDA1040_Lab1_Group2"
 author: "Aaron"
 date: "9/16/2020"
 output: pdf_document
@@ -8,16 +8,16 @@ output: pdf_document
 ### Load the libraries
 ```{r include=FALSE}
 library(data.table)
-library(dplyr)
 library(ggplot2)
 library(knitr)
 library(stringr)
 library(DT)
 library(gridExtra)
 library(tidyverse)
-library(recommenderlab)
+library(dplyr)
 library(tidyfst)
 library(treemap)
+library(recommenderlab)
 ```
 
 ### Load the data
@@ -32,12 +32,12 @@ departments <- fread('C:/Users/axiao/Downloads/data/instacart-market-basket-anal
 
 ### Peek at the dataset 1
 ```{r}
-# kable(head(orders,10))
-# kable(head(products,10))
-# kable(head(order_products,10))
-# kable(head(order_products_prior,10))
-# kable(head(aisles,10))
-# kable(head(departments,10))
+kable(head(orders,10))
+kable(head(products,10))
+kable(head(order_products,10))
+kable(head(order_products_prior,10))
+kable(head(aisles,10))
+kable(head(departments,10))
 ```
 
 ### Recode variables
@@ -56,17 +56,11 @@ departments <- departments %>% mutate(department = as.factor(department))
 orders %>% 
   ggplot(aes(x=order_hour_of_day)) + 
   geom_histogram(stat="count",fill=rainbow(24))
-samples %>% 
-  ggplot(aes(x=order_hour_of_day)) + 
-  geom_histogram(stat="count",fill=rainbow(24))
 ```
 
 ### Day of Week
 ```{r}
 orders %>% 
-  ggplot(aes(x=order_dow)) + 
-  geom_histogram(stat="count",fill=rainbow(7))
-samples %>% 
   ggplot(aes(x=order_dow)) + 
   geom_histogram(stat="count",fill=rainbow(7))
 ```
@@ -76,14 +70,13 @@ samples %>%
 orders %>% 
   ggplot(aes(x=days_since_prior_order)) + 
   geom_histogram(stat="count",fill="blue")
-samples %>% 
-  ggplot(aes(x=days_since_prior_order)) + 
-  geom_histogram(stat="count",fill="green")
 ```
 
 ### How many prior orders are there?
 ```{r}
-prior_order = count(filter(orders, eval_set=="prior"), order_number)
+prior_order = orders %>% 
+  filter(eval_set=="prior") %>% 
+  count(order_number)
 ggplot(data = prior_order, aes(order_number,n)) +
   geom_line(color="blue", size=1) +
   geom_point(color="blue", size=2)
@@ -92,36 +85,23 @@ ggplot(data = prior_order, aes(order_number,n)) +
 ### The distributions of how many items are in the orders
 ```{r}
 train_1 <- order_products %>% 
-          group_by(order_id) %>% 
-          summarize(n_items_train = last(add_to_cart_order))
-train_2 <- samples %>% 
-          group_by(order_id) %>% 
-          summarize(n_items_train = last(add_to_cart_order))
-# prior_1 <- order_products_prior %>% 
-#           group_by(order_id) %>% 
-#           summarize(n_items_prior = last(add_to_cart_order))
+  group_by(order_id) %>% 
+  summarize(n_items_train = last(add_to_cart_order))
 
-ggplot() + 
-  geom_histogram(data=train_1, aes(x=n_items_train),col="red",alpha = 0.3) +
-  # geom_histogram(data=prior_1, aes(x=n_items_prior),col="blue",alpha = 0.3) +
-  geom_histogram(data=train_2, aes(x=n_items_train),col="blue",alpha = 0.3) +
+ggplot(data=train_1, aes(x=n_items_train),col="red",alpha = 0.3) +
+  geom_histogram(stat="count",fill="red") +
+  geom_rug() +
   coord_cartesian(xlim=c(0,80))
 ```
 
 ### How often do people order the same items again
 ```{r}
 re_order <- order_products %>% 
-            group_by(reordered) %>% 
-            summarize(count = n()) %>% 
+  group_by(reordered) %>% 
+  summarize(count = n()) %>% 
   mutate(reordered = as.factor(reordered)) %>%
   mutate(proportion = count/sum(count))
 head(re_order)
-re_order_sample <- samples %>%  
-            group_by(reordered) %>% 
-            summarize(count = n()) %>% 
-  mutate(reordered = as.factor(reordered)) %>%
-  mutate(proportion = count/sum(count))
-head(re_order_sample)
 ```
 
 ```{r}
@@ -145,27 +125,6 @@ p1 = ggplot (tmp1, aes(x=reorder(product_name,count), y=percentage)) +
          axis.title.x = element_blank()) 
 p2 = ggplot (data = tmp1, aes( x= '', y=percentage )) + 
   ggtitle('Products Top 20') + 
-  ylab('percentage.of.orders') + 
-  geom_boxplot() + 
-  xlab('Products')
-grid.arrange(p1, p2, ncol = 2)
-```
-
-### 
-```{r}
-tmp1_1 <- samples %>%
-  group_by(product_name) %>%
-  summarize(count=n()) %>%
-  top_n(n=20, wt=count) %>%  
-  mutate(percentage=count/sum(count))
-p1 = ggplot (tmp1_1, aes(x=reorder(product_name,count), y=percentage)) +  
-  geom_col() + 
-  ggtitle('Sample Products Top 20') + 
-  ylab('Percentage of Orders') +
-  theme (axis.text.x=element_text(angle=90, hjust=1, vjust=0.5),
-         axis.title.x = element_blank()) 
-p2 = ggplot (data = tmp1_1, aes( x= '', y=percentage )) + 
-  ggtitle('Sample Products Top 20') + 
   ylab('percentage.of.orders') + 
   geom_boxplot() + 
   xlab('Products')
@@ -225,9 +184,9 @@ order_products_prior %>%
   summarize(n=n()) %>%
   mutate(percentage=n/sum(n)) %>%
   top_n(10, wt=n) %>%
-  ggplot (aes(x=as.factor(order_dow), y=percentage, fill=product_name)) + 
-    geom_col() + ylab('Proprtion of Orders') + ggtitle('Daily Top 10 Products Ordered') +
-    theme(legend.position="bottom",legend.direction="horizontal")
+  ggplot (aes(x=as.factor(order_dow), y=percentage, fill=product_name)) +
+  geom_col() + ylab('Proprtion of Orders') + ggtitle('Daily Top 10 Products Ordered') +
+  theme(legend.position="bottom",legend.direction="horizontal")
 ```
 
 ### 
@@ -239,9 +198,9 @@ order_products_prior %>%
   mutate(percentage=n/sum(n)) %>%
   top_n(10, wt=n) %>%
   ggplot(aes(x=as.factor(order_hour_of_day), y=percentage, fill=product_name)) + 
-    geom_col() + ylab('Proprtion of Orders In An Hour') + 
-    ggtitle('Hourly Top 10 Products Ordered') +
-    theme(legend.position="bottom",legend.direction="horizontal")
+  geom_col() + ylab('Proprtion of Orders In An Hour') + 
+  ggtitle('Hourly Top 10 Products Ordered') +
+  theme(legend.position="bottom",legend.direction="horizontal")
 ```
 
 ## Visualizing the Product Portfolio
@@ -271,8 +230,7 @@ tmp5 <-order_products %>%
 ### Visualize in aisles organized within departments?
 ```{r}
 treemap(tmp5,index=c("department","aisle"), vSize="onesize",vColor="department", 
-        palette="Set3", title="", sortID="-sumcount", border.col="#FFFFFF") 
-        #type="categorical", fontsize.legend = 0,bg.labels = "#FFFFFF")
+        palette="Set3", title="", sortID="-sumcount", border.col="#FFFFFF")
 ```
 
 ### How many unique products are offered in each department/aisle?
@@ -306,7 +264,7 @@ data_train = orders %>%
   inner_join(order_pro4) %>%
   left_join(products) %>% 
   mutate(actual = as.integer(1)) %>%   #this is training label
-  select(user_id, order_id, product_id, actual)
+  select(user_id, order_id, product_id, product_name, actual)
 ```
 
 ### Since the data is too large for R to proceed, sampling 12.5% data
@@ -448,6 +406,11 @@ customer_order <- c(39821, 31562, 6844, 30960, 13914)
 ```
 
 ### convert the order in a format that recommenderlab accept
+
+```{r}
+gc() # clean the memory
+```
+
 ```{r}
 new_order_rat_matrx <- data_train %>%
   select(product_id) %>%
@@ -487,4 +450,9 @@ as(pred, 'list')
 result_name <- products %>% 
   filter(product_id == "1215" | product_id == "1940" | product_id == "4037" | product_id == "4658" | product_id == "4913")
 head(result_name)
+```
+```{r}
+data_train %>%
+  as.data.frame() %>%
+  write.csv("C:\\Users\\axiao\\Downloads\\data\\final_dataset.csv", row.names = FALSE)
 ```
