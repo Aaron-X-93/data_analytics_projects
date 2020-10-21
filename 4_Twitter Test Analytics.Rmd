@@ -6,160 +6,437 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-library(twitteR)
-library(purrr)
-library(dplyr)
-library(plyr)
-library(stringr)
-library(ROAuth)
-library(RCurl)
-library(openssl)
-library(httpuv)
+library(rtweet)
+# library(purrr)
+# library(plyr)
+# library(stringr)
+# library(ROAuth)
+# library(RCurl)
+# library(openssl)
+# library(httpuv)
 library(wordcloud)
 library(tm)
 library(SnowballC)
-library(wordcloud2)
+# library(wordcloud2)
 library(dplyr)
 library(lubridate) # created variable in y-m-d-h-s format
+library(syuzhet) # Sentiment analysis
+library(ggplot2)
+# library(tidyr)
+# library(tidytext)
+# library(twitteR) # old library, replaced by rtweet
 ```
 
+### set the twitter API key
 ```{r}
 app_name = 'CSDA_Lab'
 consumer_key <- "vtvxi6T1bKkGxDjrEAydhLISt" 
 consumer_secret <- "KUydMhnG7HK42a48pxFIKjPT5AsbAgI5wUjtWLZtY9MgAMaJUB" 
 access_token <- "1312534545858691073-apEjK0Mk8TinBSCAoPM4g8bstKQCrJ" 
 access_secret <- "qsk5KXFOw0Ec68CVsgk99wajb9TAGCwiTWx3Nc78UIaYp" 
-setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_secret) 
+# setup_twitter_oauth(consumer_key, consumer_secret,
+#                     access_token, access_secret)
+twitter_token <- create_token(app = app_name, consumer_key,
+                              consumer_secret, access_token,
+                              access_secret, set_renv = TRUE)
+```
+
+### check the fuctions
+```{r}
+# ?searchTwitter # twiteR
+# ?search_tweets # rtweet
+# ?search_fullarchive # rtweet (premium)
+?search_30day # rtweet (premium)
 ```
 
 ```{r}
-# politician_list <- searchTwitter ("@PoliticianTwitterHandle", n=500) 
-listA <- searchTwitter ('US election', n=100)
-listB <- searchTwitter ('US election + economy', n=100)
+# sample for using library(twitteR), not in this project
+list_twitteR <- searchTwitter("ai", n=100,
+                       lang = 'en',
+                       since = '2020-01-01',
+                       geocode = '43.773886,-79.386672,15mi')
+
+# list_twitteR[1:10]
+# head(list_twitteR)
+
+# convert to df
+list_twitteR_df <- bind_rows(lapply(list_twitteR, as.data.frame))
+list_twitteR_df
 ```
 
 ```{r}
-country1 <- search_tweets("#Canada", n=100, include_rts = FALSE)
-country2 <- search_tweets("#Scotland", n=100, include_rts = FALSE)
+# sample for using google API to get tweets within certain area
+list_googleAPI <- search_tweets(
+  'smarter AI', n=100,
+  include_rts = FALSE,
+  type = 'mixed',
+  lookup_coords("ontario",
+                apikey = 'AIzaSyCGe13kdUEn4qW9Id-1OeL2E7ft_D4A0MY'),
+  lang = "en",
+  token = twitter_token)
 ```
 
 ```{r}
-davis_list <- searchTwitter ("@rodneydavis" , n=100) 
+# sample for search the archive with Premium Sandbox
+listA <- search_fullarchive(
+  "#AI lang:en point_radius:[-79.386672 43.773886 25mi]", 
+  n = 100,
+  fromDate = "202001150000",
+  toDate = "202001212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-# convert the list to a data frame
-davis_df <- bind_rows(lapply(davis_list, as.data.frame))
+# sample for search the 30 days tweets with Premium Sandbox
+# point_radius:[lon lat radius](Toronto: 43.6532° N, 79.3832° W)
+# place_country = 'Canada'
+# '(#AI OR AI OR #artificialintelligence OR "artificial intelligence")(lang:en)(place:ON OR place:Ontario OR place:GTA OR place:Toronto)',
+
+list_30days <- search_30day(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]',
+  n = 2000,
+  fromDate = "202010010000",
+  toDate = "202010132359",
+  env_name = 'lastmonth', # no number inside!
+  safedir = NULL,
+  parse = TRUE,
+  token = NULL)
+```
+
+
+## Pull recent data with the topic of "Smarter and responsible AI"
+
+### search with different key words and different historical time periods
+```{r}
+list_01 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202001150000",
+  toDate = "202001212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+
+# for search_30day or search_fullarchive, using: 
+# "#ai lang:en point_radius:[-79.386672 43.773886 15mi]" at the beginning
+# pay attention for the sequence of the long/lati value
+# since = '2020-01-01', until = '2020-09-30' not work since it only for the recent 7 days
 ```
 
 ```{r}
-davis_df$date <- day(davis_df$created) 
-davis_df$hour <- hour(davis_df$created) 
-# separating out distinct date and hour variable from the current format time 
-# created variable in the dataset is in y-m-d-h-s format
+list_02 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202002190000",
+  toDate = "202002252359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-#Volume of tweets by date/hour
-ggplot(davis_df, aes(x = date)) + 
-  geom_density() 
-ggplot(davis_df, aes(x = hour)) +
-  geom_density() 
-```
-
-### Most commonly used words for Davis in positive and negative context, i.e., sentiments of speech
-```{r}
-# Data cleaning – removing twitter mentions, stop words “the”, “it”, punctuations, capitalizations, etc.
-davis_df$text <- gsub("@[[:alpha:]]*","", davis_df$text)  # remove twitter mentions
-text_corpus <- Corpus(VectorSource(davis_df$text))  # convert dataframe containing “text” into corpus 
-text_corpus <- tm_map(text_corpus, tolower) # converting to lowercase
-text_corpus <- tm_map(text_corpus, removeWords, c("rodneydavis", "rt", "re", "amp")) 
-# remove “rodneydavis”, and tweets which are retweet and reply and &
+list_03 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202002260000",
+  toDate = "202003032359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-library(tm)
-text_corpus <- tm_map(text_corpus, removeWords, stopwords("english")) # remove stop words
-text_corpus <- tm_map(text_corpus, removePunctuation)  # remove punctuations
+list_04 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202003250000",
+  toDate = "202003312359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-text_df <- data.frame(text_clean = get("content", text_corpus), stringsAsFactors = FALSE)  
-# convert clean corpus into dataframe
+list_05 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202004290000",
+  toDate = "202005052359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-davis_df <- cbind.data.frame(davis_df, text_df) 
-# combine text_df to davis_df
-```
-
-### Sentiment Analysis
-```{r}
-install.packages("SentimentAnalysis")
-library(SentimentAnalysis)
-# Sentiment scoring of each tweet based on 4 dictionaries GI, HE, LM, QDAP
-davis_sentiment <- analyzeSentiment(davis_df$text_clean)
-```
-
-```{r}
-#Isolating tweets which have more negative sentiments
-davis_sentiment <- dplyr::select(davis_sentiment, SentimentGI, SentimentHE, SentimentLM, SentimentQDAP, WordCount)  # sum sentiment scoring for each tweet
+list_05 <- search_fullarchive(
+  '#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning  lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 200,
+  fromDate = "202003250000",
+  toDate = "202003312359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-davis_sentiment <- dplyr::mutate(davis_sentiment, mean_sentiment = rowMeans(davis_sentiment[,-5])) 
-#mean value of sentiment for each tweet
+list_06 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202006030000",
+  toDate = "202006092359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-davis_sentiment <- dplyr::select(davis_sentiment, WordCount, mean_sentiment) 
-davis_df <- cbind.data.frame(davis_df, davis_sentiment) 
+list_07 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 200,
+  fromDate = "202007080000",
+  toDate = "202007142359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-davis_df_negative <- filter(davis_df, mean_sentiment < 0) 
-nrow(davis_df_negative) 
-```
-
-### The most commonly contained topics within tweets (frequency analysis)
-```{r}
-library(quanteda) 
-davis_tokenized_list <- tokens(davis_df_negative$text_clean)  # separating out each word individually
-```
-
-```{r}
-davis_dfm <- dfm(davis_tokenized_list)  # creating feature document matrix (tweet x words)
-word_sums <- colSums(davis_dfm)  # count of the use for every word
-length(word_sums) 
+list_08 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202007150000",
+  toDate = "202007212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-freq_data <- data.frame(word = names(word_sums), freq = word_sums, row.names = NULL, stringsAsFactors = FALSE)   # frequency of each word
+list_09 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202008120000",
+  toDate = "202008182359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
 ```{r}
-sorted_freq_data <- freq_data[order(freq_data$freq, decreasing = TRUE), ]  # sorted most to least common words
+list_10 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202009160000",
+  toDate = "202009222359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
 ```
 
-### Create topic clusters (i.e., grouping words which are most associated with each other) 
+### search the most recent tweets (last 7 days)
 ```{r}
-davis_corpus_tm <- Corpus(VectorSource(davis_df_negative[,19]))  
-# converting 19th column (text_clean) into corpus format text_clean
+list_recent <- search_tweets(
+  '#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning lang:en', 
+  n = 5000,
+  include_rts = FALSE,
+  geocode = '43.773886,-79.386672,25mi',
+  token = NULL)
+```
+
+### combine all the data we get
+```{r}
+list_aaron <- rbind(list_01, list_02, list_03, list_04, list_05,
+                    list_06, list_07, list_08, list_09, list_10,
+                    list_30days, list_recent)
+```
+
+### export a csv file
+```{r}
+# mode(list_aaron) # type "list"
+
+list_aaron %>%
+  write_as_csv(
+    "C:\\Users\\axiao\\Downloads\\data\\twitter_aaron.csv", 
+    prepend_ids = FALSE, na = "", fileEncoding = "UTF-8")
+```
+
+### input conbined data from all team member
+```{r}
+final_data <- read.csv(file="C:\\Users\\axiao\\Downloads\\data\\alllab2group2.csv",)
+```
+
+## Data Analyse
+
+### Process each set of tweets into tidy text or corpus objects.
+```{r}
+#convert all text to lower case
+final_data$text <- iconv(final_data$text,"WINDOWS-1252","UTF-8")
+final_text <- tolower(final_data$text)
 ```
 
 ```{r}
-davis_dtm <- DocumentTermMatrix(davis_corpus_tm) # converting it into document term matrix
-davis_dtm <- removeSparseTerms(davis_dtm, 0.98) # removing words which are below threshold (2%)
-davis_df_cluster <- as.data.frame(as.matrix(davis_dtm))  # converting dtm into dataframe
+# Replace blank space
+final_text <- gsub("rt", "", final_text)
+# Replace @UserName
+final_text <- gsub("@\\w+", "", final_text)
 ```
 
 ```{r}
-#Exploratory graph analysis – word clusters based on correaltions
-# install.packages("devtools")
-library(devtools)
-devtools::install_github("hfgolino/EGA")
-library(EGA) 
-ega_davis <- EGA(davis_df_cluster)  # visual indicating words in each node
-ega_davis$dim.variables   # word –cluster association
+# Remove punctuation
+final_text <- gsub("[[:punct:]]", "", final_text)
+```
+
+```{r}
+# Remove tabs
+final_text <- gsub("[ |\t]{2,}", "", final_text)
+
+# Remove blank spaces at the beginning
+final_text <- gsub("^ ", "", final_text)
+
+# Remove blank spaces at the end
+final_text <- gsub(" $", "", final_text)
+```
+
+### Stop word handling
+```{r}
+#corpus build - remove stop words
+final_text_corpus <- Corpus(VectorSource(final_text))
+final_text_corpus <- tm_map(
+  final_text_corpus, 
+  function(x)removeWords(x,stopwords()))
+```
+
+## Visulaise Data - Word Cloud to the frequent words used
+
+### top 15 commonly used words in the set
+```{r}
+final_data$stripped_text1 <- final_text #gsub("http\\s+","", final_data$text)
+final_data_stem <- final_data %>% 
+  select(stripped_text1) %>% 
+  unnest_tokens(word, stripped_text1)
+cleaned_final_data <- final_data_stem %>% 
+  anti_join(stop_words)
+```
+
+```{r}
+cleaned_final_data %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(15) %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col(aes(fill = n), show.legend = F) +
+  coord_flip() +
+  theme_classic() +
+  labs(x = "Count", y = "Unique Words",
+       title = "Unique words counts found in tweets related to AI topic")
+```
+
+### Perform sentiment analysis using the Bing lexicon and get_sentiments function from the tidytext package.
+```{r}
+# bing sentiment analysis
+bing_ai = cleaned_final_data %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(word, sentiment, sort = TRUE) %>% 
+  ungroup()
+```
+
+```{r}
+bing_ai %>% 
+  group_by(sentiment) %>% 
+  top_n(15) %>% 
+  ungroup() %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = F) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  coord_flip() +
+  theme_classic() +
+  labs(x = NULL, y = "Contribution to sentiment",
+       title = "Tweets containing 'AI topic'")
+```
+
+### Visualizing word count (n > 20) by BING sentiment category
+```{r}
+cleaned_final_data %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(word, sentiment, sort = T) %>% 
+  filter(n > 10) %>%
+  mutate(n=ifelse(sentiment=="negative", -n, n), word=reorder(word, n)) %>%
+  ggplot(aes(word, n, fill=sentiment)) + 
+  geom_col() + coord_flip()
+```
+
+### Word Cloud to the frequent words used
+```{r}
+wordcloud(final_text_corpus, 
+          min.freq = 500, 
+          colors = brewer.pal(8, "Dark2"),
+          random.color = TRUE,
+          max.words = 80)
+```
+
+### Sentiment analysis
+```{r}
+#sentiment analysis
+final_text_sent<-get_nrc_sentiment((final_text))
+
+#calculationg total score for each sentiment
+final_text_sent_score<-data.frame(colSums(final_text_sent[,]))
+
+names(final_text_sent_score)<-"Score"
+final_text_sent_score<-cbind("sentiment"=rownames(final_text_sent_score),final_text_sent_score)
+rownames(final_text_sent_score)<-NULL
+```
+
+```{r}
+#plotting the sentiments with scores
+ggplot(
+  data = final_text_sent_score,
+  aes(x=sentiment,y=Score)) + 
+  geom_bar(aes(fill=sentiment),stat = "identity") +
+  theme(legend.position="none") +
+  xlab("Sentiments")+ylab("scores") +
+  ggtitle("Sentiments of AI ")
+```
+
+```{r}
+#remove positive , negative score
+final_text_sent_no_pos_neg<-select(final_text_sent,anger,anticipation,disgust,joy,sadness,surprise,trust)
+
+#calculationg total score for each sentiment
+final_text_sent_no_pos_neg<-data.frame(colSums(final_text_sent_no_pos_neg[,]))
+
+names(final_text_sent_no_pos_neg)<-"Score"
+final_text_sent_no_pos_neg<-cbind("sentiment"=rownames(final_text_sent_no_pos_neg),final_text_sent_no_pos_neg)
+rownames(final_text_sent_no_pos_neg)<-NULL
+
+
+#plotting the sentiments with scores
+ggplot(
+  data=final_text_sent_no_pos_neg,
+  aes(x=sentiment,y=Score)) + 
+  geom_bar(aes(fill=sentiment), stat = "identity")+
+  theme(legend.position="none") +
+  xlab("Sentiments")+ylab("scores") + 
+  ggtitle("Sentiments of AI")
+```
+
+### Top 10 words in these tweets
+```{r}
+
 ```
 
