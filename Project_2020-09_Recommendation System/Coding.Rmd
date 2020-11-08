@@ -1,5 +1,5 @@
 ---
-title: "CSDA1040_Lab1_Group2"
+title: "Recommendation System for Instacart"
 author: "Aaron"
 date: "9/16/2020"
 output: pdf_document
