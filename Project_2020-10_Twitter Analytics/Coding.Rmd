@@ -1,5 +1,5 @@
 ---
-title: "4_Twitter Text Analytics"
+title: "Twitter Text Analytics"
 author: "Aaron"
 date: "10/3/2020"
 output: pdf_document
