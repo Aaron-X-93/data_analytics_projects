@@ -1,5 +1,6 @@
 ### Overview
 Projects in 2020
+Please see the detailed coding and reporting file in each folder.
 
 #### 1 Hotel Bookings Predition Analysis
 
