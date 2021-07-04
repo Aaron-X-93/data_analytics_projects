@@ -1,0 +1,580 @@
+---
+title: "Twitter Text Analytics"
+author: "Aaron"
+date: "10/3/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(rtweet)
+library(wordcloud)
+library(tm)
+library(SnowballC)
+library(dplyr)
+library(lubridate) # created variable in y-m-d-h-s format
+library(syuzhet) # Sentiment analysis
+library(ggplot2)
+library(tidyr)
+library(tidytext)
+# library(twitteR) # old library, replaced by rtweet
+```
+
+### set the twitter API key
+```{r}
+app_name = 'CSDA_Lab'
+consumer_key <- "********" 
+consumer_secret <- "********" 
+access_token <- "********" 
+access_secret <- "********" 
+# setup_twitter_oauth(consumer_key, consumer_secret,
+#                     access_token, access_secret)
+twitter_token <- create_token(app = app_name, consumer_key,
+                              consumer_secret, access_token,
+                              access_secret, set_renv = TRUE)
+```
+
+### check the fuctions
+```{r}
+# ?searchTwitter # twiteR
+# ?search_tweets # rtweet
+# ?search_fullarchive # rtweet (premium)
+?search_30day # rtweet (premium)
+```
+
+```{r}
+# sample for using library(twitteR), not in this project
+list_twitteR <- searchTwitter("ai", n=100,
+                       lang = 'en',
+                       since = '2020-01-01',
+                       geocode = '43.773886,-79.386672,15mi')
+
+# list_twitteR[1:10]
+# head(list_twitteR)
+
+# convert to df
+list_twitteR_df <- bind_rows(lapply(list_twitteR, as.data.frame))
+list_twitteR_df
+```
+
+```{r}
+# sample for using google API to get tweets within certain area
+list_googleAPI <- search_tweets(
+  'smarter AI', n=100,
+  include_rts = FALSE,
+  type = 'mixed',
+  lookup_coords("ontario",
+                apikey = '********'),
+  lang = "en",
+  token = twitter_token)
+```
+
+```{r}
+# sample for search the archive with Premium Sandbox
+listA <- search_fullarchive(
+  "#AI lang:en point_radius:[-79.386672 43.773886 25mi]", 
+  n = 100,
+  fromDate = "202001150000",
+  toDate = "202001212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+# sample for search the 30 days tweets with Premium Sandbox
+# point_radius:[lon lat radius](Toronto: 43.6532° N, 79.3832° W)
+# place_country = 'Canada'
+# '(#AI OR AI OR #artificialintelligence OR "artificial intelligence")(lang:en)(place:ON OR place:Ontario OR place:GTA OR place:Toronto)',
+
+list_30days <- search_30day(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]',
+  n = 2000,
+  fromDate = "202010010000",
+  toDate = "202010132359",
+  env_name = 'lastmonth', # no number inside!
+  safedir = NULL,
+  parse = TRUE,
+  token = NULL)
+```
+
+
+## Pull recent data with the topic of "Smarter and responsible AI"
+
+### search with different key words and different historical time periods
+```{r}
+list_01 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202001150000",
+  toDate = "202001212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+
+# for search_30day or search_fullarchive, using: 
+# "#ai lang:en point_radius:[-79.386672 43.773886 15mi]" at the beginning
+# pay attention for the sequence of the long/lati value
+# since = '2020-01-01', until = '2020-09-30' not work since it only for the recent 7 days
+```
+
+```{r}
+list_02 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202002190000",
+  toDate = "202002252359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_03 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202002260000",
+  toDate = "202003032359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_04 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202003250000",
+  toDate = "202003312359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_05 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202004290000",
+  toDate = "202005052359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_05 <- search_fullarchive(
+  '#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning  lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 200,
+  fromDate = "202003250000",
+  toDate = "202003312359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_06 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202006030000",
+  toDate = "202006092359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_07 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 200,
+  fromDate = "202007080000",
+  toDate = "202007142359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_08 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202007150000",
+  toDate = "202007212359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_09 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202008120000",
+  toDate = "202008182359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+```{r}
+list_10 <- search_fullarchive(
+  '(#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning) lang:en point_radius:[-79.386672 43.773886 25mi]', 
+  n = 100,
+  fromDate = "202009160000",
+  toDate = "202009222359",
+  env_name = 'oldset',
+  safedir = NULL,
+  parse = TRUE,
+  token = twitter_token)
+```
+
+### search the most recent tweets (last 7 days)
+```{r}
+list_recent <- search_tweets(
+  '#AI OR #machinelearning OR #responsibleAI OR #smarterAI OR #deeplearning lang:en', 
+  n = 5000,
+  include_rts = FALSE,
+  geocode = '43.773886,-79.386672,25mi',
+  token = NULL)
+```
+
+### combine all the data we get
+```{r}
+list_aaron <- rbind(list_01, list_02, list_03, list_04, list_05,
+                    list_06, list_07, list_08, list_09, list_10,
+                    list_30days, list_recent)
+```
+
+### export a csv file
+```{r}
+# mode(list_aaron) # type "list"
+
+list_aaron %>%
+  write_as_csv(
+    "C:\\Users\\axiao\\Downloads\\data\\twitter_aaron.csv", 
+    prepend_ids = FALSE, na = "", fileEncoding = "UTF-8")
+```
+
+### input conbined data from all team member
+```{r}
+final_data <- read.csv(file="C:\\Users\\axiao\\Downloads\\data\\alllab2group2.csv",)
+```
+
+## Data Analyse
+
+### Process each set of tweets into tidy text or corpus objects.
+```{r}
+#convert all text to lower case
+final_data$text <- iconv(final_data$text,"WINDOWS-1252","UTF-8")
+final_text <- tolower(final_data$text)
+```
+
+```{r}
+# Replace blank space
+final_text <- gsub("#rt", "", final_text)
+# Replace @UserName
+final_text <- gsub("@\\w+", "", final_text)
+```
+
+```{r}
+# Remove punctuation
+final_text <- gsub("[[:punct:]]", "", final_text)
+```
+
+```{r}
+# Remove tabs
+final_text <- gsub("[ |\t]{2,}", "", final_text)
+
+# Remove blank spaces at the beginning
+final_text <- gsub("^ ", "", final_text)
+
+# Remove blank spaces at the end
+final_text <- gsub(" $", "", final_text)
+```
+
+### Stop word handling
+```{r}
+#corpus build - remove stop words
+final_text_corpus <- Corpus(VectorSource(final_text))
+final_text_corpus <- tm_map(
+  final_text_corpus, 
+  function(x)removeWords(x,stopwords()))
+```
+
+## Visulaise Data - Word Cloud to the frequent words used
+
+### top 15 commonly used words in the set
+```{r}
+final_data$stripped_text1 <- final_text #gsub("http\\s+","", final_data$text)
+final_data_stem <- final_data %>% 
+  select(stripped_text1) %>% 
+  unnest_tokens(word, stripped_text1)
+cleaned_final_data <- final_data_stem %>% 
+  anti_join(stop_words)
+```
+
+```{r}
+cleaned_final_data %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(15) %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col(aes(fill = n), show.legend = F) +
+  coord_flip() +
+  theme_classic() +
+  labs(x = "Count", y = "Unique Words",
+       title = "Unique words counts found in tweets related to AI topic")
+```
+
+### Perform sentiment analysis using the Bing lexicon and get_sentiments function from the tidytext package.
+```{r}
+# bing sentiment analysis
+bing_ai = cleaned_final_data %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(word, sentiment, sort = TRUE) %>% 
+  ungroup()
+```
+
+```{r}
+bing_ai %>% 
+  group_by(sentiment) %>% 
+  top_n(15) %>% 
+  ungroup() %>% 
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = F) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  coord_flip() +
+  theme_classic() +
+  labs(x = NULL, y = "Contribution to sentiment",
+       title = "Tweets containing 'AI topic'")
+```
+
+### Visualizing word count (n > 20) by BING sentiment category
+```{r}
+cleaned_final_data %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(word, sentiment, sort = T) %>% 
+  filter(n > 10) %>%
+  mutate(n=ifelse(sentiment=="negative", -n, n), word=reorder(word, n)) %>%
+  ggplot(aes(word, n, fill=sentiment)) + 
+  geom_col() + coord_flip()
+```
+
+### 
+```{r}
+final_data$hour <- hour(final_data$created) 
+final_data$date <- day(final_data$created)
+final_data$month <- month(final_data$created)
+# separating out distinct date and hour variable from the current format time 
+# created variable in the data set in y-m-d-h-s format
+
+#Volume of tweets by hour/date/month
+ggplot(final_data, aes(x = hour)) +
+  geom_density() 
+
+ggplot(final_data, aes(x = date)) + 
+  geom_density() 
+
+ggplot(final_data, aes(x = month)) +
+  geom_density() 
+```
+
+### Word Cloud to the frequent words used
+```{r}
+wordcloud(final_text_corpus, 
+          min.freq = 500, 
+          colors = brewer.pal(8, "Dark2"),
+          random.color = TRUE,
+          max.words = 80)
+```
+
+### Sentiment analysis
+```{r}
+#sentiment analysis
+final_text_sent<-get_nrc_sentiment((final_text))
+
+#calculationg total score for each sentiment
+final_text_sent_score<-data.frame(colSums(final_text_sent[,]))
+
+names(final_text_sent_score)<-"Score"
+final_text_sent_score<-cbind("sentiment"=rownames(final_text_sent_score),final_text_sent_score)
+rownames(final_text_sent_score)<-NULL
+```
+
+```{r}
+#plotting the sentiments with scores
+ggplot(
+  data = final_text_sent_score,
+  aes(x=sentiment,y=Score)) + 
+  geom_bar(aes(fill=sentiment),stat = "identity") +
+  theme(legend.position="none") +
+  xlab("Sentiments")+ylab("scores") +
+  ggtitle("Sentiments of AI ")
+```
+
+```{r}
+#remove positive , negative score
+final_text_sent_no_pos_neg<-select(final_text_sent,anger,anticipation,disgust,joy,sadness,surprise,trust)
+
+#calculationg total score for each sentiment
+final_text_sent_no_pos_neg<-data.frame(colSums(final_text_sent_no_pos_neg[,]))
+
+names(final_text_sent_no_pos_neg)<-"Score"
+final_text_sent_no_pos_neg<-cbind("sentiment"=rownames(final_text_sent_no_pos_neg),final_text_sent_no_pos_neg)
+rownames(final_text_sent_no_pos_neg)<-NULL
+
+
+#plotting the sentiments with scores
+ggplot(
+  data=final_text_sent_no_pos_neg,
+  aes(x=sentiment,y=Score)) + 
+  geom_bar(aes(fill=sentiment), stat = "identity")+
+  theme(legend.position="none") +
+  xlab("Sentiments")+ylab("scores") + 
+  ggtitle("Sentiments of AI")
+```
+
+## Clustering Words
+
+### Building a Term-Document Matrix
+```{r}
+tdm <- TermDocumentMatrix(final_text_corpus, control=list(wordLengths=c(1,Inf)))
+```
+
+### find clusters of words with hierarchical clustering
+```{r}
+# remove sparse terms which below threshold (5%)
+tdm2 <- removeSparseTerms(tdm, sparse=0.95)
+m2 <- as.matrix(tdm2)
+
+# cluster terms
+distMatrix <- dist(scale(m2))
+fit <- hclust(distMatrix, method="ward.D")
+```
+
+### plot the clustering result
+```{r}
+plot(fit)
+# cut tree into 10 clusters
+rect.hclust(fit, k=5)
+(groups <- cutree(fit, k=5))
+```
+
+### Exploratory graph analysis – word clusters based on correaltions
+```{r}
+# converting matrix into dataframe
+dtm <- DocumentTermMatrix(final_text_corpus)
+dtm <- removeSparseTerms(dtm, 0.95)
+ai_cluster <- as.data.frame(as.matrix(dtm))
+```
+
+```{r}
+# library("devtools")
+# devtools::install_github("hfgolino/EGA", dep = TRUE)
+library("EGAnet")
+```
+
+```{r}
+# install.packages('sna')
+# library(sna)
+# visual indicating words in each node
+ega_ai <- EGA(
+  ai_cluster, 
+  model = "TMFG", # c("glasso", "TMFG")
+  algorithm = "walktrap", #  c("walktrap", "louvain")
+  plot.EGA = TRUE,
+  n = NULL,
+  algorithm.args = list(steps = 5),
+  nvar = 10,
+  nfact = 1,
+  load = 0.8,
+)
+
+# word –cluster association
+ega_ai$dim.variables
+```
+
+### Multidimensional Scaling of Word Distance (Pairwise Correlation)
+```{r}
+# library(ggrepel)
+# MDS
+cmdscale(distMatrix) %>% 
+  data.frame %>% 
+  ggplot(aes(x = X1, y = X2)) +
+  geom_point(color = c("lightblue","gold","pink","lightgreen")[groups], 
+             alpha = 0.7, size = 4, show.legend = F) + 
+  geom_text_repel(aes(label = names(groups)))
+```
+
+### Word Networking with Q-Graph (Pairwise Count)
+```{r}
+library(qgraph)
+
+# Term matrix
+tm <- m2 %*% t(m2)
+```
+
+```{r}
+# Q-graph
+nNode=ncol(tm)
+sNode=scales::rescale(diag(tm), c(0.5, 4))
+qgraph(tm , layout="spring", shape="ellipse", diag=F, minimum=5,
+       vsize=sNode, color="gold", node.width=2, node.height=1.4, 
+       borders=F, vTrans=180, label.cex=1, label.prop=1, 
+       labels=colnames(tm), label.scale=F, esize=5, edge.color="gray80",
+       layout.par=list(init=matrix(rnorm(nNode*2), nNode, 2)))
+```
+
+### Word Networking with I-Graph (Pairwise Count)
+```{r}
+library(igraph)
+library(scales)
+
+g <- graph.adjacency(tm, weighted=T, mode="undirected")
+g <- simplify(g) # remove loops
+
+V(g)$label <- V(g)$name # set labels and denetrees of vertices
+V(g)$size <- 20 # Set node size 
+V(g)$color <- "lightblue" # set node color
+V(g)$label.cex <- rescale(diag(tm), c(0.5, 4)) # set size of vertices
+V(g)$label.color <- "black" # set color of vertices
+V(g)$frame.color <- "transparent" # set frame of verticles
+E(g)$width <- rescale(log(E(g)$weight), c(0.1, 2)) # set width of ednetes   
+E(g)$color <- "gray80" # set color of ednetes
+
+set.seed(3952)
+plot(g)
+```
+
+### Top Bigrams
+```{r}
+library(tidytext)
+library(tidyr)
+# Tokenizing to Bigrams
+bigram_data <- final_data %>% unnest_tokens(bigram, stripped_text1, token="ngrams", n=2) 
+
+# Separated and cleaned Bigrams
+bigrams_cleaned  <- bigram_data %>% separate(bigram, c("word1", "word2"), sep =" ") %>%
+  filter(word1 != word2) %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  unite(bigram, word1, word2, sep=" ") 
+
+# Top Cleaned Bigrams
+bigrams_cleaned %>% count(bigram) %>% filter(n>20) %>% ggplot(aes(x=reorder(bigram, n), y=n)) + 
+  geom_col(aes(fill=n), show.legend=F) + 
+  labs(x="Bigram", y="Count") + coord_flip()
+```
+
