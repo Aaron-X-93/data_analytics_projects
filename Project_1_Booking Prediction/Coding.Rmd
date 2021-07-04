@@ -1,0 +1,460 @@
+---
+title: "Hotel Booking Prediction"
+author: "Aaron"
+date: "4/18/2020"
+output: pdf_document
+---
+
+### Load the libraries and the data
+```{r, include=FALSE}
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library(Hmisc)
+library(corrplot)
+library(mice)
+library(VIM)
+library(caret)
+library(sqldf)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(plyr)
+library(countrycode)
+library(epiDisplay)
+library(randomForest)
+library(maptree)
+library(cluster)
+library(car)
+library(ROCR)
+library(pROC)
+```
+
+### input data
+```{r}
+hotel_data=read.csv(file.choose(), header = TRUE, stringsAsFactors = T, na.strings = c("NA","","#NA"))
+
+# for business model, we only consider the city hotel
+hotel_data <- subset(hotel_data, hotel=="City Hotel")
+
+# set default searching dataframe
+attach(hotel_data)
+```
+
+
+# Data Preparation
+
+### check # of rows
+```{r}
+ncol(hotel_data);
+nrow(hotel_data);
+```
+
+### preview data structure with HEAD(), STR(), and SUMMARY()
+```{r}
+head(hotel_data)
+str(hotel_data)
+summary(hotel_data)
+```
+
+### check missing values
+```{r}
+colSums(is.na(hotel_data))
+
+# We have NA in children, replace with 0
+hotel_data$children[is.na(hotel_data$children)]=0
+```
+
+### visulize the data Completeness
+```{r}
+df_miss = aggr(hotel_data, col=c('skyblue','red','orange'), numbers=TRUE, sortVars=TRUE,
+labels=names(hotel_data), cex.axis=.7, gap=3, ylab=c("Proportion of missingness","Missingness Pattern"))
+```
+
+
+# Data Visualization
+
+### Check distribution of target variable
+```{r}
+freq_tbl=table(hotel_data$is_canceled)
+prop.table(freq_tbl)
+barplot(freq_tbl)
+```
+
+### put month into sequence
+```{r}
+hotel_data$arrival_date_month <-
+  factor(hotel_data$arrival_date_month, levels = month.name)
+```
+
+### booking request by month (expect arrivel month)
+```{r}
+ggplot(data = hotel_data, aes(x = arrival_date_month)) +
+  geom_bar(position="dodge", fill=rainbow(12)) +
+  geom_text(stat = "count", aes(label = ..count..), hjust = 0.5) +
+  labs(title = "Booking request by month",
+                      x = "Month",
+                      y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Coding months to season
+```{r}
+hotel_data$season[hotel_data$arrival_date_month=="March"|hotel_data$arrival_date_month=="April"|hotel_data$arrival_date_month=="May"]<-"Spring"
+hotel_data$season[hotel_data$arrival_date_month=="June"|hotel_data$arrival_date_month=="July"|hotel_data$arrival_date_month=="August"]<-"Summer"
+hotel_data$season[hotel_data$arrival_date_month=="September"|hotel_data$arrival_date_month=="October"|hotel_data$arrival_date_month=="November"]<-"Fall"
+hotel_data$season[hotel_data$arrival_date_month=="December"|hotel_data$arrival_date_month=="January"|hotel_data$arrival_date_month=="February"]<-"Winter"
+```
+
+# check where are the people come from
+```{r}
+# the actural customer has checked in but already departed
+hotel_data_1 <- hotel_data[hotel_data$reservation_status == "Check-Out",]
+
+# select countries only with more than 1500 customers
+sub_hotel <- hotel_data_1 %>% 
+  group_by(country) %>% 
+  filter(n() > 1500)
+
+# Visualize the Travellor by Country.
+library(countrycode)
+sub_hotel$county_name <- countrycode(sub_hotel$country, 
+                                     origin = "iso3c",
+                                     destination = "country.name")
+
+# Traveller by Country per hotel wise
+ggplot(sub_hotel, aes(county_name, fill = season)) + 
+  geom_bar(stat = "count", position = position_dodge()) + 
+  labs(title = "Booking Status by Country",
+       x = "Country",
+       y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.background = element_blank())
+```
+
+### Create new grouping for country - using top 5 then group remaining
+```{r}
+hotel_data$countrygrp[country=="PRT"]<-"PRT"
+hotel_data$countrygrp[country=="FRA"]<-"FRA"
+hotel_data$countrygrp[country=="DEU"]<-"DEU"
+hotel_data$countrygrp[country=="GBR"]<-"GBR"
+hotel_data$countrygrp[country=="ESP"]<-"ESP"
+hotel_data$countrygrp[country=="AGO"|country=="BDI"	|country=="BEN"	|country=="BFA"	|country=="BWA"	|country=="CAF"	|country=="CIV"	|country=="CMR"	|country=="COM"	|country=="CPV"	|country=="DJI"	|country=="DZA"	|country=="EGY"	|country=="ETH"	|country=="GAB"	|country=="GHA"	|country=="GIB"	|country=="GNB"	|country=="KEN"	|country=="KIR"	|country=="MAR"	|country=="MDG"	|country=="MLI"	|country=="MOZ"	|country=="MRT"	|country=="MUS"	|country=="MWI"	|country=="MYT"	|country=="NAM"	|country=="NGA"	|country=="RWA"	|country=="SDN"	|country=="SEN"	|country=="SLE"	|country=="STP"	|country=="SYC"	|country=="TGO"	|country=="TUN"	|country=="TZA"	|country=="UGA"	|country=="ZAF"	|country=="ZMB"	|country=="ZWE"
+]<-"Africa"
+hotel_data$countrygrp[country=="AZE"	|country=="BGD"	|country=="CHN"	|country=="CN"	|country=="GEO"	|country=="HKG"	|country=="IDN"	|country=="IND"	|country=="JPN"	|country=="KAZ"	|country=="KHM"	|country=="KOR"	|country=="LAO"	|country=="LKA"	|country=="MAC"	|country=="MMR"	|country=="MYS"	|country=="NPL"	|country=="PAK"	|country=="PHL"	|country=="PLW"	|country=="SGP"	|country=="THA"	|country=="TJK"	|country=="TWN"	|country=="UZB"	|country=="VNM"
+]<-"Asia"
+hotel_data$countrygrp[country=="ARG"	|country=="BOL"	|country=="BRA"	|country=="CHL"	|country=="COL"	|country=="CRI"	|country=="CUB"	|country=="DOM"	|country=="ECU"	|country=="GTM"	|country=="GUY"	|country=="HND"	|country=="MEX"	|country=="NIC"	|country=="PAN"	|country=="PER"	|country=="PRI"	|country=="PRY"	|country=="SLV"	|country=="SUR"	|country=="URY"	|country=="VEN"]<-"Latin America"
+hotel_data$countrygrp[country=="ARE"	|country=="ARM"	|country=="BHR"	|country=="IRN"	|country=="IRQ"	|country=="ISR"	|country=="JOR"	|country=="KWT"	|country=="LBN"	|country=="LBY"	|country=="OMN"	|country=="QAT"	|country=="SAU"	|country=="SYR"	|country=="TUR"]<-"Middle East"
+hotel_data$countrygrp[country=="UMI"|country=="USA"]<-"North America"
+hotel_data$countrygrp[country=="ASM"	|country=="ATA"	|country=="ATF"	|country=="AUS"	|country=="FJI"	|country=="FRO"	|country=="MDV"	|country=="NCL"	|country=="NULL"	|country=="NZL"	|country=="PYF"	|country=="TMP"	|country=="VGB"| country=="ABW"	|country=="AIA"	|country=="BHS"	|country=="BRB"	|country=="CYM"	|country=="DMA"	|country=="GLP"	|country=="JAM"	|country=="KNA"	|country=="LCA"]<-"Other"
+hotel_data$countrygrp[country=="ALB"	|country=="AND"	|country=="AUT"	|country=="BEL"	|country=="BGR"	|country=="BIH"	|country=="BLR"	|country=="CHE"	|country=="CYP"	|country=="CZE"	|country=="DNK"	|country=="EST"	|country=="FIN"	|country=="GGY"	|country=="GRC"	|country=="HRV"	|country=="HUN"	|country=="IMN"	|country=="IRL"	|country=="ISL"	|country=="ITA"	|country=="JEY"	|country=="LIE"	|country=="LTU"	|country=="LUX"	|country=="LVA"	|country=="MCO"	|country=="MKD"	|country=="MLT"	|country=="MNE"	|country=="NLD"	|country=="NOR"	|country=="POL"	|country=="ROU"	|country=="RUS"	|country=="SMR"	|country=="SRB"	|country=="SVK"	|country=="SVN"	|country=="SWE"	|country=="UKR"]<-"Other Europe"
+tab1(hotel_data$countrygrp)
+```
+
+### see relationship between agents and cancelation by different customer type
+```{r}
+ggplot(data = hotel_data,aes(x = market_segment,fill = is_canceled))+
+geom_bar(aes(fill=customer_type),position="dodge",stat = "count")+
+labs(title = "Cancel status by Agents",
+       x = "Agent",
+       y = "No. of cancel") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_color_brewer(palette = "Set1")
+```
+  
+### see relationship between distribution channe and cancelation by different customer type
+```{r}
+ggplot(data = hotel_data,aes(x = distribution_channel,fill = is_canceled))+
+geom_bar(aes(fill=customer_type),position="dodge",stat = "count")+
+labs(title = "Cancel status by distribution channel",
+       x = "distribution channel",
+       y = "No. of cancel") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + scale_color_brewer(palette = "Set2")
+```
+
+### merge GDS with undefined
+```{r}
+hotel_data$distribution="TA/TO"
+hotel_data$distribution[hotel_data$distribution_channel=="Corporate"]<-"Corporate"
+hotel_data$distribution[hotel_data$distribution_channel=="Direct"]<-"Direct"               
+hotel_data$distribution[hotel_data$distribution_channel=="GDS"|hotel_data$distribution_channel=="Undefined"]<-"Other"
+xtab_distr=xtabs(~hotel_data$distribution_channel+hotel_data$distribution)
+head(xtab_distr)
+```
+
+### see relationship between the deposit type and cancellation
+```{r}
+ggplot(data = hotel_data, aes(x = deposit_type,
+         y = prop.table(stat(count)),
+         fill = factor(is_canceled),
+         label = scales::percent(prop.table(stat(count)))
+       )) +
+  geom_bar(position = position_dodge()) +
+  geom_text(
+    stat = "count",
+    position = position_dodge(.9),
+    vjust = -0.5,
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Cancellation Status by deposit Type",
+       x = "deposit Type",
+       y = "Count") +
+  theme_classic() +
+  scale_fill_discrete(
+    name = "Booking Status",
+    breaks = c("0", "1"),
+    labels = c("Cancelled", "Not Cancelled")
+  )
+```
+
+### see whether have kids or not has influence
+```{r}
+hotel_data$haskid = 0
+hotel_data$haskid[children>0|babies>0]<-1
+kid_tbl=table(hotel_data$haskid)
+prop.table(kid_tbl)
+barplot(kid_tbl)
+```
+
+### cross table for cancellation and haskid
+```{r}
+xtab_type=xtabs(~hotel_data$is_canceled+hotel_data$haskid)
+prop.table(xtab_type)
+head(xtab_type)
+```
+
+### check other features
+```{r}
+barplot(table(hotel_data$lead_time), legend.text="lead time")
+barplot(table(hotel_data$arrival_date_year), legend.text="booking in different year")
+barplot(table(hotel_data$is_repeated_guest), legend.text="repeated guest")
+barplot(table(hotel_data$previous_cancellations), legend.text="previous cancellations")
+barplot(table(hotel_data$previous_bookings_not_canceled), legend.text="previous bookings not canceled")
+barplot(table(hotel_data$booking_changes), legend.text="booking changes")
+barplot(table(hotel_data$adr), legend.text="Average Daily Rate")
+barplot(table(hotel_data$required_car_parking_spaces), legend.text="required car parking spaces")
+barplot(table(hotel_data$total_of_special_requests), legend.text="total of special requests")
+```
+
+### set certain features just for 0 or 1
+```{r}
+hotel_data$previous_cancellations[previous_cancellations>0] <- 1
+hotel_data$booking_changes[booking_changes>0] <- 1
+hotel_data$required_car_parking_spaces[required_car_parking_spaces>0] <- 1
+hotel_data$total_of_special_requests[total_of_special_requests>0] <- 1
+```
+
+
+# Data Modeling
+### review the data we have now
+```{r}
+head(hotel_data)
+```
+
+
+# Modeling
+
+## Training and testing data preparation
+```{r}
+# fix random seed
+set.seed(5)
+
+# select related variables
+# drop reservation_status & reservation_status_date since this is not the inputs for predict
+final_data <- subset(hotel_data, select = c(is_canceled, lead_time, season, haskid, countrygrp, distribution, is_repeated_guest, previous_cancellations, booking_changes, deposit_type, required_car_parking_spaces, total_of_special_requests))
+```
+
+### split to train and test data
+```{r}
+train_id <- createDataPartition(y= final_data$is_canceled, p=0.8, list = FALSE)
+training1 <- final_data[train_id,]
+testing1 <- final_data[-train_id,]
+prop.table((table(training1$is_canceled)))
+prop.table((table(testing1$is_canceled)))
+```
+
+
+## Logical Regression
+
+### review training data
+```{r}
+training2 = training1
+testing2 = testing1
+str(training2)
+```
+
+### Season to dummy
+```{r}
+dummy_season <- model.matrix(~season, training2)
+dummy_cnt <- model.matrix(~countrygrp, training2)
+dummy_dst <- model.matrix(~distribution, training2)
+```
+
+### train the model
+```{r}
+mod_lr <- glm(is_canceled ~ ., data = training2, family = "binomial")
+```
+
+### 
+```{r}
+summary(mod_lr)
+```
+
+```{r}
+hist(residuals(mod_lr), xlab = "", main = "")
+```
+
+### using the model on testing data
+```{r}
+dummy_season_2 <- model.matrix(~season, testing2)
+dummy_cnt_2 <- model.matrix(~countrygrp, testing2)
+dummy_dst_2 <- model.matrix(~distribution, testing2)
+```
+
+```{r}
+Prob_lm <- predict(object = mod_lr, newdata = testing2, type = "response")
+Pred_lm <- ifelse(Prob_lm >= 0.45, "yes", "no")
+```
+
+```{r}
+Pred_lm <- factor(Pred_lm, levels = c("no","yes"), order=TRUE)
+f <- table(testing2$is_canceled, Pred_lm)
+f
+```
+
+```{r}
+(8092+4286)/length(testing2$is_canceled)
+```
+
+### Accracy and ROC
+```{r}
+auc(testing2$is_canceled, Pred_lm)
+pr_lr <- prediction(as.numeric(Pred_lm), as.numeric(testing2$is_canceled))
+perf_lr <- performance(pr_lr, measure = "tpr", x.measure = "fpr")
+plot(perf_lr)
+```
+
+### Visualize the result of the decision tree model
+```{r}
+df_lr = data.frame(testing2$is_canceled, as.numeric(Pred_lm))
+colnames(df_lr) <- c("Test","Prediction")
+ggplot(df_lr, aes(x = Test, y = Prediction)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.25, pch=20, col=rgb(0.1, 0.2, 0.8, 0.3))
+qqPlot(as.numeric(Pred_lm), main="" )
+```
+
+
+## decision tree model
+
+### convert variables to factor type
+```{r}
+training = training1
+testing = testing1
+for (i in c(1,3,4,5,6,7,8,9,10,11,12)){
+  training[,i] <- as.factor(training[,i])
+  testing[,i] <- as.factor(testing[,i])
+}
+```
+
+### train the model
+```{r}
+mod_tree <- rpart(is_canceled ~ ., data = training, method = "class", parms=list(split="gini"))
+```
+
+```{r}
+summary(mod_tree)
+```
+
+### results of the training
+```{r}
+fancyRpartPlot(mod_tree)
+printcp(mod_tree)
+mod_tree$variable.importance
+```
+
+### see how it performs on the testing data
+```{r}
+Pred_dt <- predict(mod_tree, testing, type = "class")
+table(testing$is_canceled, Pred_dt, dnn = c('Actual','Predicted'))
+cor(as.numeric(Pred_dt),as.numeric(testing$is_canceled))
+```
+
+```{r}
+(9107+2988)/length(testing2$is_canceled)
+```
+
+### AUC
+```{r}
+auc(testing2$is_canceled, as.numeric(Pred_dt))
+```
+
+### Visualize the result of the decision tree model
+```{r}
+df_dt = data.frame(testing$is_canceled, Pred_dt)
+colnames(df_dt) <- c("Test","Prediction")
+ggplot(df_dt, aes(x = Test, y = Prediction)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.25, pch=20, col=rgb(0.1, 0.2, 0.8, 0.3))
+qqPlot(as.numeric(Pred_dt), main="" )
+```
+
+
+## Random Forest
+
+### train the model
+```{r}
+mod_rf <- randomForest(is_canceled ~ ., method = "class", data = training, 
+                       na.action = na.fail, importance = TRUE,
+                       nodesize = 1, ntree = 200, mtry = 8)
+```
+
+### try to decide ntree number
+```{r}
+plot(mod_rf)
+```
+
+### try to decide mtry number
+```{r}
+n <- ncol(training) -1
+errRate <- c(1)
+for (i in 1:n){
+  m <- randomForest(is_canceled ~ ., method = "class", data = training,
+                    mtry=i, ntree = 200)  
+  err<-mean(m$err.rate)  
+  print(err)  
+  }
+```
+So we choose mtry = 8
+
+### check the importance of the dataset attributes for the prediction
+```{r}
+varImpPlot(mod_rf, main="")
+summary(mod_rf)
+```
+
+### predict on the testing data
+```{r}
+Pred_rf <- predict(mod_rf, testing)
+table(testing$is_canceled, Pred_rf, dnn = c('Actual','Predicted'))
+cor(as.numeric(Pred_rf),as.numeric(testing$is_canceled))
+```
+
+```{r}
+(8181+4864)/length(testing2$is_canceled)
+```
+
+### AUC
+```{r}
+auc(testing2$is_canceled, as.numeric(Pred_rf))
+```
+
+### Visualize the result of the decision tree model
+```{r}
+df_rf = data.frame(testing$is_canceled, Pred_rf)
+colnames(df_rf) <- c("Test","Prediction")
+ggplot(df_rf, aes(x = Test, y = Prediction)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.25, pch=20, col=rgb(0.1, 0.2, 0.8, 0.3))
+qqPlot(as.numeric(Pred_rf), main="" )
+```
