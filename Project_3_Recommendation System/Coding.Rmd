@@ -248,7 +248,7 @@ treemap(tmp5,index=c("department","aisle"),vSize="sumcount",title="",palette="Se
 
 ## Predictive Analysis
 
-### only select orders contains 4 to 10 items
+### only select orders contains 5 to 10 items
 ```{r}
 order_pro4 <- order_products %>% 
   group_by(order_id) %>%
@@ -267,7 +267,7 @@ data_train = orders %>%
   select(user_id, order_id, product_id, product_name, actual)
 ```
 
-### Since the data is too large for R to proceed, sampling 12.5% data
+### Since the data is too large, extend the memory limit to 80G
 ```{r}
 # need enough memory to run the matrix
 gc()
