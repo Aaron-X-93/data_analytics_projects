@@ -248,7 +248,7 @@ treemap(tmp5,index=c("department","aisle"),vSize="sumcount",title="",palette="Se
 
 ## Predictive Analysis
 
-### only select orders contains >= 4 items
+### only select orders contains 4 to 10 items
 ```{r}
 order_pro4 <- order_products %>% 
   group_by(order_id) %>%
